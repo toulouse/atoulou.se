@@ -1,0 +1,24 @@
+defaultEntryPoints = ["http", "https"]
+
+[web]
+address = ":9080"
+  [web.auth.basic]
+  users = ["admin:$apr1$23wuWgln$pOcyM.wmvjROnSGtemH/y1"]
+
+[entryPoints]
+  [entryPoints.http]
+  address = ":80"
+    [entryPoints.http.redirect]
+    entryPoint = "https"
+  [entryPoints.https]
+  address = ":443"
+    [entryPoints.https.tls]
+      [[entryPoints.https.tls.certificates]]
+      CertFile = "/certs/atoulou.se.pem"
+      KeyFile = "/certs/atoulou.se.key"
+
+[docker]
+endpoint = "unix:///var/run/docker.sock"
+domain = "atoulou.se"
+watch = true
+exposedbydefault = false

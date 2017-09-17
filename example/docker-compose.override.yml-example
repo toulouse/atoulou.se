@@ -1,0 +1,9 @@
+version: '3'
+
+services:
+  mysql:
+    environment:
+      MYSQL_ROOT_PASSWORD: foobar
+  wordpress:
+    environment:
+      WORDPRESS_DB_PASSWORD: foobar

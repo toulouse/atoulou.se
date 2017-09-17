@@ -1,0 +1,106 @@
+version: '3'
+
+services:
+  traefik:
+    image: traefik
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./traefik.toml:/etc/traefik/traefik.toml
+      - certs-volume:/certs
+    networks:
+      - proxy 
+    ports:
+      - "80:80"
+      - "443:443"
+      - "9080:9080"
+    restart: always
+    cap_drop:
+      - all
+    cap_add:
+      - net_bind_service
+  letsencrypt-cron:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=letsencrypt-cron"
+      - "traefik.frontend.rule=Host:atoulou.se,www.atoulou.se,irc.atoulou.se;PathPrefix:/.well-known/acme-challenge"
+      - "traefik.docker.network=proxy"
+      - "traefik.port=80"
+    image: henridwyer/docker-letsencrypt-cron
+    volumes:
+      - certs-volume:/certs
+    restart: always
+    environment:
+      DOMAINS: atoulou.se www.atoulou.se irc.atoulou.se
+      EMAIL: andrew@atoulou.se
+      CONCAT: 0
+      SEPARATE: 0
+    networks:
+      - proxy
+    depends_on:
+      - traefik
+  mysql:
+    image: mariadb:latest
+    volumes:
+      - db-volume:/var/lib/mysql
+    networks:
+      - internal
+  adminer:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=adminer"
+      - "traefik.frontend.rule=Host:www.atoulou.se,atoulou.se;PathPrefixStrip:/adminer"
+      - "traefik.frontend.auth.basic=admin:$$apr1$$23wuWgln$$pOcyM.wmvjROnSGtemH/y1"
+      - "traefik.docker.network=proxy"
+      - "traefik.port=8080"
+    image: adminer:latest
+    networks:
+      - internal
+      - proxy
+    depends_on:
+      - mysql
+  wordpress:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=wordpress"
+      - "traefik.frontend.rule=Host:www.atoulou.se,atoulou.se"
+      - "traefik.docker.network=proxy"
+      - "traefik.port=80"
+    image: wordpress:php7.1
+    volumes:
+      - wp-volume:/var/www/html
+    environment:
+      WORDPRESS_DB_HOST: mysql
+    networks:
+      - internal
+      - proxy
+    depends_on:
+      - traefik
+      - mysql
+  lounge:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=lounge"
+      - "traefik.frontend.rule=Host:irc.atoulou.se"
+      - "traefik.docker.network=proxy"
+      - "traefik.port=9000"
+    image: thelounge/lounge:latest
+    volumes:
+      - ~/.lounge:/home/lounge/data
+    restart: always
+    environment:
+      NODE_TLS_REJECT_UNAUTHORIZED: 0
+    networks:
+      - proxy
+    ports:
+      - "113:113"
+    depends_on:
+      - traefik
+volumes:
+  certs-volume:
+  db-volume:
+  wp-volume:
+networks:
+  internal:
+    external: false
+  proxy:
+    external: true
