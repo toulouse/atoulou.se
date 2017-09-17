@@ -18,6 +18,23 @@ services:
       - all
     cap_add:
       - net_bind_service
+  portainer:
+    image: portainer/portainer
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --no-auth --host=unix:///var/run/docker.sock
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=portainer"
+      - "traefik.frontend.rule=Host:www.atoulou.se,atoulou.se;PathPrefixStrip:/portainer"
+      - "traefik.frontend.auth.basic=admin:$$apr1$$23wuWgln$$pOcyM.wmvjROnSGtemH/y1"
+      - "traefik.docker.network=proxy"
+      - "traefik.port=9000"
+    restart: always
+    networks:
+      - proxy
+    depends_on:
+      - traefik
   letsencrypt-cron:
     labels:
       - "traefik.enable=true"
