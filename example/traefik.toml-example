@@ -1,9 +1,9 @@
 defaultEntryPoints = ["http", "https"]
 
 [web]
-address = ":9080"
+address = ":8080"
   [web.auth.basic]
-  users = ["admin:$apr1$23wuWgln$pOcyM.wmvjROnSGtemH/y1"]
+  users = ["<output of htpasswd -n admin>"]
 
 [entryPoints]
   [entryPoints.http]

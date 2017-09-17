@@ -1,0 +1,10 @@
+route:
+    receiver: 'slack'
+
+receivers:
+    - name: 'slack'
+      slack_configs:
+          - send_resolved: true
+            username: 'Site Alert'
+            channel: '#general'
+            api_url: '<incoming-webhook URL>'

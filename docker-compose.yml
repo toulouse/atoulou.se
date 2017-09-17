@@ -7,12 +7,14 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./traefik.toml:/etc/traefik/traefik.toml
       - certs-volume:/certs
+    command: --web --web.metrics.prometheus --web.metrics.prometheus.buckets="0.1,0.3,1.2,5.0" --docker --loglevel=DEBUG
     networks:
       - proxy 
+      - internal
     ports:
+      - "8080:8080"
       - "80:80"
       - "443:443"
-      - "9080:9080"
     restart: always
     cap_drop:
       - all
@@ -27,14 +29,12 @@ services:
       - "traefik.enable=true"
       - "traefik.backend=portainer"
       - "traefik.frontend.rule=Host:www.atoulou.se,atoulou.se;PathPrefixStrip:/portainer"
-      - "traefik.frontend.auth.basic=admin:$$apr1$$23wuWgln$$pOcyM.wmvjROnSGtemH/y1"
       - "traefik.docker.network=proxy"
       - "traefik.port=9000"
     restart: always
     networks:
       - proxy
-    depends_on:
-      - traefik
+      - internal 
   letsencrypt-cron:
     labels:
       - "traefik.enable=true"
@@ -55,25 +55,24 @@ services:
       - proxy
     depends_on:
       - traefik
+  watchtower:
+    image: v2tec/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --cleanup
   mysql:
     image: mariadb:latest
     volumes:
       - db-volume:/var/lib/mysql
     networks:
       - internal
-  adminer:
-    labels:
-      - "traefik.enable=true"
-      - "traefik.backend=adminer"
-      - "traefik.frontend.rule=Host:www.atoulou.se,atoulou.se;PathPrefixStrip:/adminer"
-      - "traefik.frontend.auth.basic=admin:$$apr1$$23wuWgln$$pOcyM.wmvjROnSGtemH/y1"
-      - "traefik.docker.network=proxy"
-      - "traefik.port=8080"
-    image: adminer:latest
-    networks:
-      - internal
-      - proxy
-    depends_on:
+  adminer: 
+    image: adminer:latest 
+    networks: 
+      - internal 
+    ports: 
+      - 9001:8080 
+    depends_on: 
       - mysql
   wordpress:
     labels:
@@ -102,7 +101,7 @@ services:
       - "traefik.port=9000"
     image: thelounge/lounge:latest
     volumes:
-      - ~/.lounge:/home/lounge/data
+      - ./lounge:/home/lounge/data
     restart: always
     environment:
       NODE_TLS_REJECT_UNAUTHORIZED: 0
@@ -110,11 +109,89 @@ services:
       - proxy
     ports:
       - "113:113"
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+      - prometheus_volume:/prometheus
+    command:
+      - '-config.file=/etc/prometheus/prometheus.yml'
+      - '-storage.local.path=/prometheus'
+      - '-alertmanager.url=http://alertmanager:9093'
+    expose:
+      - 9090
+    ports:
+      - 9090:9090
+    links:
+      - cadvisor:cadvisor
+      - alertmanager:alertmanager
     depends_on:
-      - traefik
+      - cadvisor
+    networks:
+      - proxy
+      - internal
+  node-exporter:
+    image: prom/node-exporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command: '-collector.procfs=/host/proc -collector.sysfs=/host/sys -collector.filesystem.ignored-mount-points="^(/rootfs|/host|)/(sys|proc|dev|host|etc)($$|/)" collector.filesystem.ignored-fs-types="^(sys|proc|auto|cgroup|devpts|ns|au|fuse\.lxc|mqueue)(fs|)$$"'
+    expose:
+      - 9100
+    networks:
+      - internal
+  alertmanager:
+    image: prom/alertmanager
+    ports:
+      - 9093:9093
+    volumes:
+      - ./alertmanager/:/etc/alertmanager/
+    networks:
+      - internal
+    command:
+      - '-config.file=/etc/alertmanager/config.yml'
+      - '-storage.path=/alertmanager'
+  cadvisor:
+    image: google/cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    expose:
+      - 8080
+    networks:
+      - internal
+  grafana:
+    image: grafana/grafana
+    labels:
+      - "traefik.enable=true"
+      - "traefik.backend=grafana"
+      - "traefik.frontend.rule=Host:www.atoulou.se,atoulou.se;PathPrefixStrip:/grafana"
+      - "traefik.docker.network=proxy"
+      - "traefik.port=3000"
+    depends_on:
+      - prometheus
+    ports:
+      - 3000:3000
+    volumes:
+      - grafana_volume:/var/lib/grafana
+    environment:
+      GF_AUTH_BASIC_ENABLED: "false"
+      GF_SERVER_ROOT_URL: https://www.atoulou.se/grafana/
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_PROXY_ENABLED: "true"
+    networks:
+      - internal
+      - proxy
 volumes:
   certs-volume:
   db-volume:
+  grafana_volume:
+  prometheus_volume:
   wp-volume:
 networks:
   internal:
