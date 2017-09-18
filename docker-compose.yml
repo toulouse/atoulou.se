@@ -92,6 +92,28 @@ services:
     depends_on:
       - traefik
       - mysql
+  ldap:
+    image: dinkel/openldap
+    volumes:
+      - ldap-data-volume:/var/lib/ldap/
+      - ldap-config-volume:/etc/ldap/
+    environment:
+      SLAPD_DOMAIN: ldap.atoulou.se
+      SLAPD_ORGANIZATION: Atoulouse
+      SLAPD_ADDITIONAL_MODULES: memberof 
+    networks:
+      - internal
+  phpldapadmin:
+    image: osixia/phpldapadmin
+    environment:
+      PHPLDAPADMIN_LDAP_HOSTS: ldap
+      PHPLDAPADMIN_HTTPS: 0
+      PHPLDAPADMIN_LDAP_CLIENT_TLS: 0
+      PHPLDAPADMIN_LDAP_HOSTS: "#PYTHON2BASH:[{'ldap': [{'server': [{'tls': False}]},{'login': [{'bind_id': 'cn=admin,dc=ldap,dc=atoulou,dc=se'}]}]},]"
+    networks: 
+      - internal
+    ports:
+      - 80
   lounge:
     labels:
       - "traefik.enable=true"
@@ -192,6 +214,8 @@ volumes:
   db-volume:
   grafana_volume:
   prometheus_volume:
+  ldap-data-volume:
+  ldap-config-volume:
   wp-volume:
 networks:
   internal:

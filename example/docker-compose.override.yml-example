@@ -1,9 +1,20 @@
 version: '3'
 
 services:
+  portainer:
+    labels:
+      - "traefik.frontend.auth.basic=<output of htpasswd -n admin, dollar-sign-escaped>"
   mysql:
     environment:
       MYSQL_ROOT_PASSWORD: foobar
   wordpress:
     environment:
       WORDPRESS_DB_PASSWORD: foobar
+  ldap:
+    environment:
+      SLAPD_PASSWORD: somepw
+      SLAPD_CONFIG_PASSWORD: someotherpw
+  grafana:
+    labels:
+      - "traefik.frontend.auth.basic=<output of htpasswd -n admin, dollar-sign-escaped>"
+
